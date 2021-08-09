@@ -4,7 +4,7 @@ config for ImportTxtToDB script
 
 '''
 # Script version - Please update when the script is updated
-scriptversion = "1.0"
+scriptversion = "2.0"
 
 # Path to files to be imported 
 path = r"\\gstt.local\shared\Genetics\Array\Scanned array paperwork\Non-rushes"

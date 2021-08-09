@@ -86,6 +86,21 @@ def arg_parse():
 	   parser.add_argument('-d', '--debug', action='store_true', help="Run this mode for increased error printing")
 	   return parser.parse_args()
 
+# Check for any apostrophies in patients names and make them SQL friendly here?
+def make_txt_sql_friendly(df_row):
+    '''
+    Single apostrophes in SQL are special characters, this creates issues with some patient's names
+    This function inserts a second apostrophe to any single ones in patients names, escaping the single apostrophe in SQL  
+    INPUT: The label (df_row) of the current row of the df that is being looped through by the script 
+    RETURN: None
+    '''
+    apostrophe = "'"
+    sql_apostrophe = "''"
+    if apostrophe in df.loc[df_row,"LastName"]:
+        # Add another apostrophe to all single ones
+        df.loc[df_row,"LastName"]=  df.loc[df_row,"LastName"].replace(apostrophe, sql_apostrophe)
+    if apostrophe in df.loc[df_row,"FirstName"]:
+        df.loc[df_row,"FirstName"]=  df.loc[df_row,"FirstName"].replace(apostrophe, sql_apostrophe)
 
 # Patient booking function ==========================================
 def import_check_patients_table_moka(df_row):
@@ -106,19 +121,19 @@ def import_check_patients_table_moka(df_row):
     # See if the function can run 
     try:
         # Check if patient is in the patients table
-        check_patient_sql = ("SELECT [Patients].[InternalPatientID]" 
+        check_patient_specimentrustid_sql = ("SELECT [Patients].[InternalPatientID]" 
                 "FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON"
                 "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
-                "INNER JOIN [dbo].[gwv-dnaspecimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-dnaspecimenlinked].[PatientID])"
-                "WHERE [dbo].[gwv-dnaspecimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+                "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
+                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
         ).format(
             SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"] 
         )
-        check_patient_results = mc.fetchall(check_patient_sql) 
-        #error_list.append(check_patient_results) #DEBUG PATIENT
+        check_patient_specimentrustid_results = mc.fetchall(check_patient_specimentrustid_sql) 
+        #error_list.append(check_patient_specimentrustid_results) #DEBUG PATIENT
         # Check if SELECT has returned any rows 
         # If this returns >1 there's two patients with this spec number in Moka, NOT GOOD 
-        if len(check_patient_results) > 1: 
+        if len(check_patient_specimentrustid_results) > 1: 
             # For debugging          
             error = ("ERROR: {SpecimenTrust_ID} details in Moka Patients table twice!"
                     ).format(
@@ -127,18 +142,48 @@ def import_check_patients_table_moka(df_row):
             df.loc[df_row,'Patient_Moka_status'] = 'Failed'
             patient_error = True
         # Patient already in Patients table      
-        elif len(check_patient_results) == 1:
-            # Add status to df for logging
-            df.loc[df_row,'Patient_Moka_status'] = "Success"
-        # Patient is not in Moka
-        # Get info from GW to insert into Moka 
+        elif len(check_patient_specimentrustid_results) == 1:
+            # There's a patient in the Patients table in Moka linked to this SpecimenTrustID
+            # Now check if names match GW and Moka
+            check_patient_sql = ("SELECT [Patients].[InternalPatientID]" 
+                "FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON"
+                "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
+                "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
+                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
+                " AND [BookinLastName]= '{Last_Name}' AND [BookinFirstName]= '{First_Name}' "
+            ).format(
+                SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"],
+                Last_Name = df.loc[df_row,"LastName"],
+                First_Name = df.loc[df_row,"FirstName"]
+            )
+            check_patient_results = mc.fetchall(check_patient_sql) 
+            #error_list.append(check_patient_results) #DEBUG PATIENT
+            # Check if SELECT has returned any rows 
+            # If this returns one, there is one patient in GW who matches the entry in Moka
+            if len(check_patient_results) == 1:
+                # Add status to df for logging
+                df.loc[df_row,'Patient_Moka_status'] = "Success"
+            else:
+                # Patient with a matching SpecimenTrustID is in Moka, but the first & last name in Moka are not the same as in GW
+                # error flag, do not proceed
+                error = ("ERROR: Can't find {SpecimenTrust_ID} in GW. Names in Moka & GW might not match"
+                ).format(
+                SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
+                error_list.append(error)
+                df.loc[df_row,'Patient_Moka_status'] = "Failed: Moka & GW patient names do not match"
+                patient_error = True    
+        # There's no patient in Moka with a link to that SpecimenTrustID
+        # To add them into the patients table! Get info from GW to insert into Moka 
         else:   
             get_patient_ID_sql = ("SELECT [dbo].[gwv-patientlinked].[PatientTrustID], [dbo].[gwv-patientlinked].[DoB]" 
-                "FROM [dbo].[gwv-dnaspecimenlinked] INNER JOIN [dbo].[gwv-patientlinked] "
-                "ON [dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-dnaspecimenlinked].[PatientID]"
-                "WHERE [dbo].[gwv-dnaspecimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
+                "FROM [dbo].[gwv-specimenlinked] INNER JOIN [dbo].[gwv-patientlinked] "
+                    "ON [dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID]"
+                        "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
+                            "AND [LastName]= '{Last_Name}' AND [FirstName]= '{First_Name}' "
             ).format(
-                SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
+                SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"],
+                Last_Name = df.loc[df_row,"LastName"],
+                First_Name = df.loc[df_row,"FirstName"]
             )
             #error_list.append(get_patient_ID_sql) #DEBUG PATIENT
             # Run SQL, returns a list of tuples
@@ -218,7 +263,6 @@ def import_check_patients_table_moka(df_row):
                     )
                     #error_list.append(check_patient_insert_result) # DEBUG PATIENT
                     check_patient_insert_result = mc.fetchall(check_patient_insert_sql) 
-                    
                     # If this returns 1, the patient has been added successfully 
                     if len(check_patient_insert_result) == 1: 
                         df.loc[df_row,'Patient_Moka_status'] = "Success"
@@ -279,10 +323,10 @@ def import_check_array_table_moka(df_row):
         # but does not have the status pending, complete or not possible 
         check_ArrayTest_sql = ("SELECT [ArrayTest].[ArrayTestID]" 
                                 "FROM ( [Patients] INNER JOIN [ArrayTest] ON [Patients].[InternalPatientID] = [ArrayTest].[InternalPatientID])"
-                                "INNER JOIN ([dbo].[gwv-dnaspecimenlinked] INNER JOIN [dbo].[gwv-patientlinked] ON"
-                                "[dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-dnaspecimenlinked].[PatientID])"
+                                "INNER JOIN ([dbo].[gwv-specimenlinked] INNER JOIN [dbo].[gwv-patientlinked] ON"
+                                "[dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
                                 "ON  [dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID]"
-                                "WHERE ([dbo].[gwv-dnaspecimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+                                "WHERE ([dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
                                 "AND [ArrayTest].[StatusID] NOT IN (2,4,5))"  
                         ).format(
                             SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
@@ -295,12 +339,12 @@ def import_check_array_table_moka(df_row):
         # Patient is either in the DNA table with a completed/pending/not possible status or not in there at all, to be inserted!
         else: 
             # Get data to form INSERT statement below 
-            get_Array_data_sql = ("SELECT [Patients].[InternalPatientID], [dbo].[gwv-dnaspecimenlinked].[SpecimenID],  "
-                " [dbo].[gwv-dnaspecimenlinked].[CreatedDate]" 
+            get_Array_data_sql = ("SELECT [Patients].[InternalPatientID], [dbo].[gwv-specimenlinked].[SpecimenID],  "
+                " [dbo].[gwv-specimenlinked].[CreatedDate]" 
                 " FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON "
                 "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
-                "INNER JOIN [dbo].[gwv-dnaspecimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-dnaspecimenlinked].[PatientID])"
-                "WHERE [dbo].[gwv-dnaspecimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+                "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
+                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
         ).format(
                 SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
             )
@@ -321,15 +365,16 @@ def import_check_array_table_moka(df_row):
             adjusted_referall_date = date_time_three_sf(date_to_squish) 
             get_check1ID_result = mc.fetchall(get_check1ID_sql)
             insert_ArrayTest_sql = ("INSERT INTO [ArrayTest] ([InternalPatientID], [GWSpecID], [ReferralID], [StatusID], "
-                                        "[RequestedDate], [BookedByID]) "
+                                        "[Priority], [RequestedDate], [BookedByID]) "
                                         " VALUES ('{Patient_ID}','{GW_Spec_no}', '{Patient_referral}','{Patient_Status}', "
-                                        " '{Requested_date}',  '{Booked_in_by}')" 
+                                        " '{Priority_test}','{Requested_date}',  '{Booked_in_by}')" 
             ).format(
                 # get_Array_data_sql_result returns the result of a query in a list of tuples, 
                 # where the tuple contains (InternalPatientID, SpecimenID, CreatedDate)
                 Patient_ID = get_Array_data_sql_result[0][0], 
                 GW_Spec_no = get_Array_data_sql_result[0][1],
                 Patient_Status = config.status_arraytobebookedin,
+                Priority_test = df.loc[df_row,"Urgency"], 
                 Patient_referral = config.referral_arraytobebookedin,
                 Requested_date = adjusted_referall_date, 
                 Staff_PC = computer_name,
@@ -534,7 +579,9 @@ try:
             # Fill rows with no gender to unknown 
             df['Gender'] = df['Gender'].fillna('unknown') 
             # Change to match Patients table in Moka
-            df['Gender'] = df['Gender'].replace(['Female','Male'],['F','M'])    
+            df['Gender'] = df['Gender'].replace(['Female','Male'],['F','M'])
+            # Change to match ArrayTest table in Moka 
+            df['Urgency'] = df['Urgency'].replace(['Urgent','Routine'],['True','False'])     
             if 'Processed_status' not in df.columns:
                 # Add column to df & populate it with zeros 
                 df['Processed_status'] = 0
@@ -544,6 +591,8 @@ try:
             for df_row in range(len(df)): 
                 # Don't re run a row that's already been processed  
                 if df.loc[df_row,'Processed_status'] == 0:
+                    # Make apostrophes in patients names SQL friendly 
+                    make_txt_sql_friendly(df_row)
                     # Attempt to book Patient into Moka 
                     # patient_error boolean will be set to True in the function if an error does occur     
                     patient_error = import_check_patients_table_moka(df_row)
@@ -564,8 +613,11 @@ try:
                 if df_row == len(df) - 1:
                     # Run error handling, additional prints if debug flag used 
                     error_handling() 
+                    # Swap columns back before saving txt file
+                    df['Gender'] = df['Gender'].replace(['F','M'],['Female','Male'])
+                    df['Urgency'] = df['Urgency'].replace(['True','False'], ['Urgent','Routine']) 
                     # Run save and move 
-                    save_move_txt(to_process_path, file)                              
+                    save_move_txt(to_process_path, file)                                             
 except: 
     # Print to user in Moka 
     print('ERROR: Script not run. Send the below error message to Bioinformatics team') 
