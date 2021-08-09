@@ -86,74 +86,22 @@ def arg_parse():
 	   parser.add_argument('-d', '--debug', action='store_true', help="Run this mode for increased error printing")
 	   return parser.parse_args()
 
-               
-
 # Check for any apostrophies in patients names and make them SQL friendly here?
 def make_txt_sql_friendly(df_row):
     '''
-    Single apostrophe's in SQL are special characters, this creates issues with names which contain them 
+    Single apostrophes in SQL are special characters, this creates issues with some patient's names
+    This function inserts a second apostrophe to any single ones in patients names, escaping the single apostrophe in SQL  
     INPUT: The label (df_row) of the current row of the df that is being looped through by the script 
-    RETURN: Edits to patient names in the pandas df file to make them SQL friendly
+    RETURN: None
     '''
     apostrophe = "'"
     if apostrophe in df.loc[df_row,"LastName"]:
-        # Replace any single apostrophes with double ones as per SQL requirements
+        # Add another apostrophe to all single ones
         df.loc[df_row,"LastName"]=  df.loc[df_row,"LastName"].replace("'", "''")
     if apostrophe in df.loc[df_row,"FirstName"]:
         df.loc[df_row,"FirstName"]=  df.loc[df_row,"FirstName"].replace("'", "''")
 
-
-# Determine which table in GW to take patient details from 
-def find_patient_in_GW(df_row):
-    '''
-    This function takes the specimentrustID from the txt file of patients to be imported and 
-    looks in both the specimenlinkedtable (for Postnatal sample) and then the cytospecimenlinked table (for Prenatal samples).
-    INPUT: The label (df_row) of the current row of the df that is being looped through by the script 
-    RETURN: The variable patient_GW_table. 0 = specimenlinked, 1 = cytospecimenlinked, 2 = not in either.  
-    '''
-    #try:
-    # Check if patient is in the patients table which matches the specimentTrust ID in the txt
-    check_specimenlinked_GW_table_sql = ("SELECT [dbo].[gwv-dnaspecimenlinked].[PatientID]" 
-            "FROM [dbo].[gwv-patientlinked] INNER JOIN  [dbo].[gwv-dnaspecimenlinked]"
-                "ON [dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-dnaspecimenlinked].[PatientID]"
-                    "WHERE [dbo].[gwv-dnaspecimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
-                        " AND [LastName]= '{Last_Name}' AND [FirstName]= '{First_Name}' "
-                ).format(
-                    SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"],
-                    Last_Name = df.loc[df_row,"LastName"],
-                    First_Name = df.loc[df_row,"FirstName"]
-                )
-    #error_list.append(check_specimenlinked_GW_table) #DEBUG PATIENT
-    #print(check_specimenlinked_GW_table)
-    # Check if SELECT has returned any rows 
-    # If this returns one record, the patient is in this table
-    check_specimenlinked_GW_table_results = mc.fetchall(check_specimenlinked_GW_table_sql) 
-    if len(check_specimenlinked_GW_table_results) == 1: 
-        patient_GW_table = 0
-    else: 
-        # Patient isn't in specimenlinked table, check cytospecimenlinked table 
-        check_cytospecimenlinked_GW_table_sql = ("SELECT [dbo].[gwv-cytospecimenlinked].[PatientID]" 
-            "FROM [dbo].[gwv-patientlinked] INNER JOIN  [dbo].[gwv-cytospecimenlinked]"
-                "ON [dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-cytospecimenlinked].[PatientID]"
-                    "WHERE [dbo].[gwv-cytospecimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
-                        " AND [LastName]= '{Last_Name}' AND [FirstName]= '{First_Name}' "
-                ).format(
-                    SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"],
-                    Last_Name = df.loc[df_row,"LastName"],
-                    First_Name = df.loc[df_row,"FirstName"]
-                )
-                # If this returns one record, the patient is in this table!
-        check_cytospecimenlinked_GW_table_results = mc.fetchall(check_cytospecimenlinked_GW_table_sql)
-        if len(check_cytospecimenlinked_GW_table_results) == 1: 
-            patient_GW_table = 1
-        else:
-            # Can't find patient in either table, this is an error!
-            patient_GW_table = 2
-    return(patient_GW_table)
-
-
 # Patient booking function ==========================================
-
 def import_check_patients_table_moka(df_row):
     '''
     This function takes the label of the current row of the df being looped through (df_row)
@@ -171,15 +119,15 @@ def import_check_patients_table_moka(df_row):
     patient_error = False 
     # See if the function can run 
     try:
-        # Check if patient is in the patients table which matches the specimentTrust ID in the txt
+        # Check if patient is in the patients table
         check_patient_specimentrustid_sql = ("SELECT [Patients].[InternalPatientID]" 
                 "FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON"
                 "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
                 "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
-                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
-            ).format(
-                SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"]
-            )
+                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+        ).format(
+            SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"] 
+        )
         check_patient_specimentrustid_results = mc.fetchall(check_patient_specimentrustid_sql) 
         #error_list.append(check_patient_specimentrustid_results) #DEBUG PATIENT
         # Check if SELECT has returned any rows 
@@ -192,58 +140,58 @@ def import_check_patients_table_moka(df_row):
             error_list.append(error)
             df.loc[df_row,'Patient_Moka_status'] = 'Failed'
             patient_error = True
-            patient_GW_moka_name_match = False
-        # Can find a patient linked to this SpecimenTrustID in the Patients table       
+        # Patient already in Patients table      
         elif len(check_patient_specimentrustid_results) == 1:
             # There's a patient in the Patients table in Moka linked to this SpecimenTrustID
-            # Now to check if there's someone with the SpecimentTrustID, who also has the same name in GW and in Moka
+            # Now check if names match GW and Moka
             check_patient_sql = ("SELECT [Patients].[InternalPatientID]" 
-                    "FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON"
-                    "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
-                    "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
-                    "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
-                    " AND [BookinLastName]= '{Last_Name}' AND [BookinFirstName]= '{First_Name}' "
-                ).format(
-                    SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"],
-                    Last_Name = df.loc[df_row,"LastName"],
-                    First_Name = df.loc[df_row,"FirstName"],
-                )
+                "FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON"
+                "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
+                "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
+                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
+                " AND [BookinLastName]= '{Last_Name}' AND [BookinFirstName]= '{First_Name}' "
+            ).format(
+                SpecimenTrust_ID = df.loc[df_row, "SpecimenTrustID"],
+                Last_Name = df.loc[df_row,"LastName"],
+                First_Name = df.loc[df_row,"FirstName"]
+            )
             check_patient_results = mc.fetchall(check_patient_sql) 
             #error_list.append(check_patient_results) #DEBUG PATIENT
             # Check if SELECT has returned any rows 
-            # If this returns one record, there is a patient in moka and both their name and SpecimenTrustID match in GW & Moka 
+            # If this returns one, there is one patient in GW who matches the entry in Moka
             if len(check_patient_results) == 1:
                 # Add status to df for logging
-                # Set flag to true for when array tests entered 
-                patient_GW_moka_name_match = True
                 df.loc[df_row,'Patient_Moka_status'] = "Success"
             else:
-                # Patient with a matching SpecimentTrustID is in Moka, but the first & last name in Moka are not the same as in GW
+                # Patient with a matching SpecimenTrustID is in Moka, but the first & last name in Moka are not the same as in GW
                 # error flag, do not proceed
-                error = ("ERROR: Can't find {SpecimenTrust_ID} in GW "
+                error = ("ERROR: Can't find {SpecimenTrust_ID} in GW. Names in Moka & GW might not match"
                 ).format(
                 SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
                 error_list.append(error)
-                df.loc[df_row,'Patient_Moka_status'] = 'Failed: Moka & GW patient names do not match' 
-                patient_error = True
-                patient_GW_moka_name_match = False     
+                df.loc[df_row,'Patient_Moka_status'] = "Failed: Moka & GW patient names do not match"
+                patient_error = True    
         # There's no patient in Moka with a link to that SpecimenTrustID
-        # To add them into the patients table!
+        # To add them into the patients table! Get info from GW to insert into Moka 
         else:   
-            # Get information to enter in Moka Patients table
             get_patient_ID_sql = ("SELECT [dbo].[gwv-patientlinked].[PatientTrustID], [dbo].[gwv-patientlinked].[DoB]" 
                 "FROM [dbo].[gwv-specimenlinked] INNER JOIN [dbo].[gwv-patientlinked] "
-                "ON [dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID]"
-                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
-                "AND [LastName]= '{Last_Name}' AND [FirstName]= '{First_Name}' "
+                    "ON [dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID]"
+                        "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}' "
+                            "AND [LastName]= '{Last_Name}' AND [FirstName]= '{First_Name}' "
             ).format(
                 SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"],
                 Last_Name = df.loc[df_row,"LastName"],
-                First_Name = df.loc[df_row,"FirstName"],
+                First_Name = df.loc[df_row,"FirstName"]
             )
             #error_list.append(get_patient_ID_sql) #DEBUG PATIENT
             # Run SQL, returns a list of tuples
             get_patient_ID_result = mc.fetchall(get_patient_ID_sql) 
+            # get_patient_ID_result returns the result of a query in a list of tuples, 
+            # where the tuple contains (PatientTrustID, DOB)
+            PatientTrustID = get_patient_ID_result[0][0]
+            # Make the DOB to three SF from GW six
+            Patient_DOB = date_time_three_sf(get_patient_ID_result[0][1])
             # If it does not return 1, there's no patient in GW 
             if len(get_patient_ID_result) != 1: 
                 error = ("ERROR: Can't find {SpecimenTrust_ID} in GW "
@@ -253,76 +201,90 @@ def import_check_patients_table_moka(df_row):
                 df.loc[df_row,'Patient_Moka_status'] = 'Failed' 
                 patient_error = True                 
             else: 
-                # If it does return 1, there is a patient in GW who matches the txt file
-                patient_error = False
-                # get_patient_ID_result returns the result of a query in a list of tuples, 
-                # where the tuple contains (PatientTrustID, DOB)
-                PatientTrustID = get_patient_ID_result[0][0]
-                # Make the DOB to three SF from GW six
-                Patient_DOB = date_time_three_sf(get_patient_ID_result[0][1])
-                # Assign the first part of the returned value (PatientTrustID(GW)/InternalPatientID(Moka))
-                insert_patient_sql = ("INSERT INTO [Patients] ([PatientID], [s_StatusOverall], [BookinLastName],"
-                                    "[BookinFirstName], [BookinSex], [BookinDOB], [MokaCreated], [MokaCreatedBy], [MokaCreatedPC])" 
-                                    "VALUES ('{Patient_ID}', '{Patient_Status}', '{Last_Name}', '{First_Name}',"
-                                    "'{Sex}', '{Date_of_birth}', '{Created_date}' , '{Staff_username}', '{Staff_PC}')" 
-                ).format(
-                    # Use the return to fill the insert query 
-                    Patient_ID = PatientTrustID, 
-                    Patient_Status = config.status_inprogress,
-                    Last_Name = df.loc[df_row,"LastName"],
-                    First_Name = df.loc[df_row,"FirstName"],
-                    Sex = df.loc[df_row,"Gender"],
-                    Date_of_birth = Patient_DOB,
-                    Created_date= date_time,
-                    Staff_username = username,
-                    Staff_PC = computer_name
-                )
-                #error_list.append(insert_patient_sql) # DEBUG PATIENT
-                mc.execute(insert_patient_sql) 
-                # Return the primary key (InternalPatientID) for new insert
-                patients_table_primary_key = mc.fetchone("SELECT @@IDENTITY")[0]
-                # Check all info from the txt and returned primary key is correct
-                check_patient_insert_sql = ("SELECT [Patients].[InternalPatientID] "
-                                "FROM [Patients]" 
-                                "WHERE [InternalPatientID] =  '{Internal_PT_ID}' AND [PatientID]='{Patient_ID}' AND [BookinLastName]= '{Last_Name}' "
-                                "AND [BookinFirstName]= '{First_Name}' AND [BookinSex]= '{Sex}' "
-                                "AND [BookinDOB] = '{Date_of_birth}' AND [MokaCreated]='{Created_date}'"
-                ).format(
-                    Internal_PT_ID = patients_table_primary_key,
-                    Patient_ID = PatientTrustID,
-                    Last_Name = df.loc[df_row,"LastName"],
-                    First_Name = df.loc[df_row,"FirstName"],
-                    Sex = df.loc[df_row,"Gender"],
-                    Date_of_birth = Patient_DOB,
-                    Created_date= date_time,
-                )
-                #error_list.append(check_patient_insert_result) # DEBUG PATIENT
-                check_patient_insert_result = mc.fetchall(check_patient_insert_sql) 
-                # If this returns 1, the patient has been added successfully 
-                if len(check_patient_insert_result) == 1: 
-                    df.loc[df_row,'Patient_Moka_status'] = "Success"
-                    # set flag to true for later matching 
-                    patient_GW_moka_name_match = True
-                    # Add this successful addition to the patient log 
-                    insert_log_patient_sql = ("INSERT INTO PatientLog([InternalPatientID], [LogEntry], [Date], [Login], [PCName]) "
-                            "VALUES ('{Internal_PT_ID}', 'New Patient added to Patients table {Internal_PT_ID} "
-                            "using the Automating booking in arrays script version {Script_version}',"
-                            "'{Created_date}', '{Staff_username}' , '{Staff_PC}')" 
+                # The patient is in GW & values have been returned
+                # Check the name of the patient in the txt file matches the GW PatientTrustID returned from previous SQL
+                check_patient_GW_ID_sql = ("SELECT [dbo].[gwv-patientlinked].[PatientTrustID]" 
+                                "FROM [dbo].[gwv-patientlinked] "
+                                "WHERE [PatientTrustID]='{Patient_ID}' AND [LastName]= '{Last_Name}' "
+                                "AND [FirstName]= '{First_Name}' "
+            ).format(
+                Patient_ID = PatientTrustID,
+                Last_Name = df.loc[df_row,"LastName"],
+                First_Name = df.loc[df_row,"FirstName"],
+            )
+                check_patient_GW_ID_result = mc.fetchall(check_patient_GW_ID_sql) 
+                if len(check_patient_GW_ID_result) != 1: 
+                    error = ("ERROR: {SpecimenTrust_ID} in GW, does not match names in txt file "
                     ).format(
-                        Internal_PT_ID = patients_table_primary_key, 
-                        Script_version = config.scriptversion, 
+                    SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
+                    error_list.append(error)
+                    df.loc[df_row,'Patient_Moka_status'] = 'Failed' 
+                    patient_error = True               
+                else: 
+                    # Everything matches!
+                    # Insert patient into patients table 
+                    patient_error = False
+                    # Assign the first part of the returned value (PatientTrustID(GW)/InternalPatientID(Moka))
+                    insert_patient_sql = ("INSERT INTO [Patients] ([PatientID], [s_StatusOverall], [BookinLastName],"
+                                        "[BookinFirstName], [BookinSex], [BookinDOB], [MokaCreated], [MokaCreatedBy], [MokaCreatedPC])" 
+                                        "VALUES ('{Patient_ID}', '{Patient_Status}', '{Last_Name}', '{First_Name}',"
+                                        "'{Sex}', '{Date_of_birth}', '{Created_date}' , '{Staff_username}', '{Staff_PC}')" 
+                    ).format(
+                        # Use the return to fill the insert query 
+                        Patient_ID = PatientTrustID, 
+                        Patient_Status = config.status_inprogress,
+                        Last_Name = df.loc[df_row,"LastName"],
+                        First_Name = df.loc[df_row,"FirstName"],
+                        Sex = df.loc[df_row,"Gender"],
+                        Date_of_birth = Patient_DOB,
                         Created_date= date_time,
                         Staff_username = username,
                         Staff_PC = computer_name
-                    )  
-                    mc.execute(insert_log_patient_sql) 
-                else: 
-                    error = ("ERROR: Inserting {SpecimenTrust_ID} into Patient's table failed "
-                ).format(
-                    SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
-                    error_list.append(error)
-                    df.loc[df_row,'Patient_Moka_status'] = 'Failed'
-                    patient_error = True                                      
+                    )
+                    #error_list.append(insert_patient_sql) # DEBUG PATIENT
+                    mc.execute(insert_patient_sql) 
+                    # Return the primary key (InternalPatientID) for new insert
+                    patients_table_primary_key = mc.fetchone("SELECT @@IDENTITY")[0]
+                    # Check all info from the txt and returned primary key is correct
+                    check_patient_insert_sql = ("SELECT [Patients].[InternalPatientID] "
+                                    "FROM [Patients]" 
+                                    "WHERE [InternalPatientID] =  '{Internal_PT_ID}' AND [PatientID]='{Patient_ID}' AND [BookinLastName]= '{Last_Name}' "
+                                    "AND [BookinFirstName]= '{First_Name}' AND [BookinSex]= '{Sex}' "
+                                    "AND [BookinDOB] = '{Date_of_birth}' AND [MokaCreated]='{Created_date}'"
+                    ).format(
+                        Internal_PT_ID = patients_table_primary_key,
+                        Patient_ID = PatientTrustID,
+                        Last_Name = df.loc[df_row,"LastName"],
+                        First_Name = df.loc[df_row,"FirstName"],
+                        Sex = df.loc[df_row,"Gender"],
+                        Date_of_birth = Patient_DOB,
+                        Created_date= date_time,
+                    )
+                    #error_list.append(check_patient_insert_result) # DEBUG PATIENT
+                    check_patient_insert_result = mc.fetchall(check_patient_insert_sql) 
+                    # If this returns 1, the patient has been added successfully 
+                    if len(check_patient_insert_result) == 1: 
+                        df.loc[df_row,'Patient_Moka_status'] = "Success"
+                        # Add this successful addition to the patient log 
+                        insert_log_patient_sql = ("INSERT INTO PatientLog([InternalPatientID], [LogEntry], [Date], [Login], [PCName]) "
+                                "VALUES ('{Internal_PT_ID}', 'New Patient added to Patients table {Internal_PT_ID} "
+                                "using the Automating booking in arrays script version {Script_version}',"
+                                "'{Created_date}', '{Staff_username}' , '{Staff_PC}')" 
+                        ).format(
+                            Internal_PT_ID = patients_table_primary_key, 
+                            Script_version = config.scriptversion, 
+                            Created_date= date_time,
+                            Staff_username = username,
+                            Staff_PC = computer_name
+                        )  
+                        mc.execute(insert_log_patient_sql) 
+                    else: 
+                        error = ("ERROR: Inserting {SpecimenTrust_ID} into Patient's table failed "
+                    ).format(
+                        SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
+                        error_list.append(error)
+                        df.loc[df_row,'Patient_Moka_status'] = 'Failed'
+                        patient_error = True                                      
     # If the function fails in an unexpected way 
     except Exception as e:
         patient_error = True  
@@ -338,9 +300,6 @@ def import_check_patients_table_moka(df_row):
         error_list.append(e)
     return(patient_error)
 
-
-
-
 # Test booking function ========================================================================
 
 def import_check_array_table_moka(df_row):
@@ -354,148 +313,141 @@ def import_check_array_table_moka(df_row):
     INPUT: The index of the current row of the df that is being looped through by the script 
     RETURN: test_error for error handling
 
-
     '''
     #  Define test_error boolean
     test_error = False 
     # See if the function can run
     try:
-        # Confident that names in GW and moka match, no need for extra checking 
-        if patient_GW_moka_name_match == True:
-            # Check a test for this SpecimenTrustID is already in the ArrayTest table 
-            # but does not have the status pending, complete or not possible 
-            check_ArrayTest_sql = ("SELECT [ArrayTest].[ArrayTestID]" 
-                                    "FROM ( [Patients] INNER JOIN [ArrayTest] ON [Patients].[InternalPatientID] = [ArrayTest].[InternalPatientID])"
-                                    "INNER JOIN ([dbo].[gwv-specimenlinked] INNER JOIN [dbo].[gwv-patientlinked] ON"
-                                    "[dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
-                                    "ON  [dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID]"
-                                    "WHERE ([dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
-                                    "AND [ArrayTest].[StatusID] NOT IN (2,4,5))"  
-                            ).format(
-                                SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
-                            )
-            #error_list.append(check_ArrayTest_sql) # DEBUG TEST
-            check_ArrayTest_result = mc.fetchall(check_ArrayTest_sql) 
-            # If this returns 1, there is an ongoing test already
-            if len(check_ArrayTest_result) == 1:   
-                    df.loc[df_row,'Booking_in_sample_status'] = "Test already booked in & status is not completed/pending/not possible"
-            # Patient is either in the DNA table with a completed/pending/not possible status or not in there at all, to be inserted!
-            else: 
-                # Get data to form INSERT statement below 
-                get_Array_data_sql = ("SELECT [Patients].[InternalPatientID], [dbo].[gwv-specimenlinked].[SpecimenID],  "
-                    " [dbo].[gwv-specimenlinked].[CreatedDate]" 
-                    " FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON "
-                    "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
-                    "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
-                    "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+        # Check a test for this SpecimenTrustID is already in the ArrayTest table 
+        # but does not have the status pending, complete or not possible 
+        check_ArrayTest_sql = ("SELECT [ArrayTest].[ArrayTestID]" 
+                                "FROM ( [Patients] INNER JOIN [ArrayTest] ON [Patients].[InternalPatientID] = [ArrayTest].[InternalPatientID])"
+                                "INNER JOIN ([dbo].[gwv-specimenlinked] INNER JOIN [dbo].[gwv-patientlinked] ON"
+                                "[dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
+                                "ON  [dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID]"
+                                "WHERE ([dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+                                "AND [ArrayTest].[StatusID] NOT IN (2,4,5))"  
+                        ).format(
+                            SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
+                        )
+        #error_list.append(check_ArrayTest_sql) # DEBUG TEST
+        check_ArrayTest_result = mc.fetchall(check_ArrayTest_sql) 
+        # If this returns 1, there is an ongoing test already
+        if len(check_ArrayTest_result) == 1:   
+                df.loc[df_row,'Booking_in_sample_status'] = "Test already booked in & status is not completed/pending/not possible"
+        # Patient is either in the DNA table with a completed/pending/not possible status or not in there at all, to be inserted!
+        else: 
+            # Get data to form INSERT statement below 
+            get_Array_data_sql = ("SELECT [Patients].[InternalPatientID], [dbo].[gwv-specimenlinked].[SpecimenID],  "
+                " [dbo].[gwv-specimenlinked].[CreatedDate]" 
+                " FROM ([dbo].[gwv-patientlinked] INNER JOIN [Patients] ON "
+                "[dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID] )"
+                "INNER JOIN [dbo].[gwv-specimenlinked] ON ([dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
+                "WHERE [dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
+        ).format(
+                SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
+            )
+            #error_list.append(get_Array_data_sql) # DEBUG TEST
+            # get_Array_data_sql_result returns the result of a query in a list of tuples, 
+            # where the tuple contains (InternalPatientID, SpecimenID, CreatedDate)
+            get_Array_data_sql_result = mc.fetchall(get_Array_data_sql)
+            # Get Check1ID of person running script, this is needed for ArrayTest table 
+            get_check1ID_sql = ("SELECT [Checker].[Check1ID]" 
+                            "FROM [Checker] "
+                            "WHERE [Checker].[UserName]='{Staff_username}'"
             ).format(
-                    SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
-                )
-                #error_list.append(get_Array_data_sql) # DEBUG TEST
+                Staff_username = username
+            )
+            #error_list.append(get_check1ID_sql) # DEBUG TEST
+            date_to_squish = get_Array_data_sql_result[0][2]
+            # Make datetime three SF
+            adjusted_referall_date = date_time_three_sf(date_to_squish) 
+            get_check1ID_result = mc.fetchall(get_check1ID_sql)
+            insert_ArrayTest_sql = ("INSERT INTO [ArrayTest] ([InternalPatientID], [GWSpecID], [ReferralID], [StatusID], "
+                                        "[Priority], [RequestedDate], [BookedByID]) "
+                                        " VALUES ('{Patient_ID}','{GW_Spec_no}', '{Patient_referral}','{Patient_Status}', "
+                                        " '{Priority_test}','{Requested_date}',  '{Booked_in_by}')" 
+            ).format(
                 # get_Array_data_sql_result returns the result of a query in a list of tuples, 
                 # where the tuple contains (InternalPatientID, SpecimenID, CreatedDate)
-                get_Array_data_sql_result = mc.fetchall(get_Array_data_sql)
-                # Get Check1ID of person running script, this is needed for ArrayTest table 
-                get_check1ID_sql = ("SELECT [Checker].[Check1ID]" 
-                                "FROM [Checker] "
-                                "WHERE [Checker].[UserName]='{Staff_username}'"
+                Patient_ID = get_Array_data_sql_result[0][0], 
+                GW_Spec_no = get_Array_data_sql_result[0][1],
+                Patient_Status = config.status_arraytobebookedin,
+                Priority_test = df.loc[df_row,"Urgency"], 
+                Patient_referral = config.referral_arraytobebookedin,
+                Requested_date = adjusted_referall_date, 
+                Staff_PC = computer_name,
+                # get_check1ID_result returns the result of a query in a list of tuples, 
+                # where the tuple contains a single entry (Check1ID)
+                Booked_in_by = get_check1ID_result[0][0]
+            )
+            #error_list.append(insert_ArrayTest_sql) # DEBUG TEST
+            mc.execute(insert_ArrayTest_sql)
+            # Return the newly generated ArrayTestID
+            arraytest_primary_key = mc.fetchone("SELECT @@IDENTITY")[0] 
+            # Check arraytestID and InternalPatientID match those in the txt file 
+            check_arraytest_after_insert_sql = ("SELECT [ArrayTest].[ArrayTestID]"
+                                        "FROM [ArrayTest] INNER JOIN [Patients] ON [ArrayTest].[InternalPatientID] = "
+                                        " [Patients].[InternalPatientID]  "
+                                        "WHERE [ArrayTest].[ArrayTestID] = '{Array_test_ID}' AND [Patients].[InternalPatientID] = '{Patient_ID}'"
+                                        " AND [Patients].[BookinLastName]= '{Last_Name}' AND [Patients].[BookinFirstName]= '{First_Name}' "
+                                        " AND [ArrayTest].[StatusID] = '{Patient_Status}' "                   
+            ).format(
+                Array_test_ID = arraytest_primary_key,
+                Patient_ID = get_Array_data_sql_result[0][0],
+                Last_Name = df.loc[df_row,"LastName"],
+                First_Name = df.loc[df_row,"FirstName"],
+                Patient_Status = config.status_arraytobebookedin
+            )
+            #error_list.append(check_arraytest_after_insert_sql) # DEBUG TEST 
+            check_arraytest_after_insert_result = mc.fetchall(check_arraytest_after_insert_sql)
+            # If this returns 1, the patient has successfully been booked in 
+            if len(check_arraytest_after_insert_result) != 1: 
+                error = ("ERROR: Inserting {SpecimenTrust_ID} into ArrayTest table failed "
+                    ).format(
+                        SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
+                error_list.append(error)
+                df.loc[df_row,'Booking_in_sample_status'] = 'Failed'   
+                test_error = True
+            else:
+                test_error = False
+                df.loc[df_row,'Booking_in_sample_status'] = 'Success' 
+                # Update patient log
+                insert_patient_log_array_sql = ("INSERT INTO PatientLog([InternalPatientID], [LogEntry], [Date], [Login], [PCName])"
+                                    "VALUES ('{Patient_ID}', 'New ArrayTest {Array_test_ID}"
+                                    " using the Automating booking in arrays script version {Script_version}' ,"
+                                    " '{Created_date}', '{Staff_username}' , '{Staff_PC}')" 
                 ).format(
-                    Staff_username = username
-                )
-                #error_list.append(get_check1ID_sql) # DEBUG TEST
-                date_to_squish = get_Array_data_sql_result[0][2]
-                # Make datetime three SF
-                adjusted_referall_date = date_time_three_sf(date_to_squish) 
-                get_check1ID_result = mc.fetchall(get_check1ID_sql)
-                insert_ArrayTest_sql = ("INSERT INTO [ArrayTest] ([InternalPatientID], [GWSpecID], [ReferralID], [StatusID], "
-                                            "[RequestedDate], [BookedByID], [Priority]) "
-                                            " VALUES ('{Patient_ID}','{GW_Spec_no}', '{Patient_referral}','{Patient_Status}', "
-                                            " '{Requested_date}',  '{Booked_in_by}' '{Sample_urgency})" 
-                ).format(
-                    # get_Array_data_sql_result returns the result of a query in a list of tuples, 
-                    # where the tuple contains (InternalPatientID, SpecimenID, CreatedDate)
                     Patient_ID = get_Array_data_sql_result[0][0], 
-                    GW_Spec_no = get_Array_data_sql_result[0][1],
-                    Patient_Status = config.status_arraytobebookedin,
-                    Patient_referral = config.referral_arraytobebookedin,
-                    Requested_date = adjusted_referall_date, 
-                    Staff_PC = computer_name,
-                    # get_check1ID_result returns the result of a query in a list of tuples, 
-                    # where the tuple contains a single entry (Check1ID)
-                    Booked_in_by = get_check1ID_result[0][0],
-                    Sample_urgency = df.loc[df_row,"Urgency"]
-                )
-                #error_list.append(insert_ArrayTest_sql) # DEBUG TEST
-                mc.execute(insert_ArrayTest_sql)
-                # Return the newly generated ArrayTestID
-                arraytest_primary_key = mc.fetchone("SELECT @@IDENTITY")[0] 
-                # Check arraytestID and InternalPatientID match those in the txt file 
-                check_arraytest_after_insert_sql = ("SELECT [ArrayTest].[ArrayTestID]"
-                                            "FROM [ArrayTest] INNER JOIN [Patients] ON [ArrayTest].[InternalPatientID] = "
-                                            " [Patients].[InternalPatientID]  "
-                                            "WHERE [ArrayTest].[ArrayTestID] = '{Array_test_ID}' AND [Patients].[InternalPatientID] = '{Patient_ID}'"
-                                            " AND [Patients].[BookinLastName]= '{Last_Name}' AND [Patients].[BookinFirstName]= '{First_Name}' "
-                                            " AND [ArrayTest].[StatusID] = '{Patient_Status}' "                   
-                ).format(
                     Array_test_ID = arraytest_primary_key,
-                    Patient_ID = get_Array_data_sql_result[0][0],
-                    Last_Name = df.loc[df_row,"LastName"],
-                    First_Name = df.loc[df_row,"FirstName"],
-                    Patient_Status = config.status_arraytobebookedin
+                    Script_version = config.scriptversion,
+                    Created_date = date_time,
+                    Staff_username = username,
+                    Staff_PC = computer_name
+                )  
+                mc.execute(insert_patient_log_array_sql)  
+                # Update Patients status in the Patients table to Array
+                update_patient_status_sql = ("UPDATE [Patients] "   
+                                    " SET [s_StatusOverall] = '{Patient_Status}'"
+                                    " WHERE [InternalPatientID] = '{Patient_ID}' "    
+                ).format(       
+                    Patient_Status = config.status_array,
+                    Patient_ID = get_Array_data_sql_result[0][0]
                 )
-                #error_list.append(check_arraytest_after_insert_sql) # DEBUG TEST 
-                check_arraytest_after_insert_result = mc.fetchall(check_arraytest_after_insert_sql)
-                # If this returns 1, the patient has successfully been booked in 
-                if len(check_arraytest_after_insert_result) != 1: 
-                    error = ("ERROR: Inserting {SpecimenTrust_ID} into ArrayTest table failed "
-                        ).format(
-                            SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] ) 
-                    error_list.append(error)
-                    df.loc[df_row,'Booking_in_sample_status'] = 'Failed'   
-                    test_error = True
-                else:
-                    test_error = False
-                    df.loc[df_row,'Booking_in_sample_status'] = 'Success' 
-                    # Update patient log
-                    insert_patient_log_array_sql = ("INSERT INTO PatientLog([InternalPatientID], [LogEntry], [Date], [Login], [PCName])"
-                                        "VALUES ('{Patient_ID}', 'New ArrayTest {Array_test_ID}"
-                                        " using the Automating booking in arrays script version {Script_version}' ,"
+                #error_list.append(sql_update_status) # DEBUG TEST 
+                mc.execute(update_patient_status_sql)
+                insert_patient_log_status_sql = ("INSERT INTO PatientLog([InternalPatientID], [LogEntry], [Date], [Login], [PCName]) "
+                                        "VALUES ('{Patient_ID}', 'Patient status updated to Array " 
+                                        "using the Automating booking in arrays script version {Script_version}',"
                                         " '{Created_date}', '{Staff_username}' , '{Staff_PC}')" 
-                    ).format(
-                        Patient_ID = get_Array_data_sql_result[0][0], 
-                        Array_test_ID = arraytest_primary_key,
-                        Script_version = config.scriptversion,
-                        Created_date = date_time,
-                        Staff_username = username,
-                        Staff_PC = computer_name
-                    )  
-                    mc.execute(insert_patient_log_array_sql)  
-                    # Update Patients status in the Patients table to Array
-                    update_patient_status_sql = ("UPDATE [Patients] "   
-                                        " SET [s_StatusOverall] = '{Patient_Status}'"
-                                        " WHERE [InternalPatientID] = '{Patient_ID}' "    
-                    ).format(       
-                        Patient_Status = config.status_array,
-                        Patient_ID = get_Array_data_sql_result[0][0]
-                    )
-                    #error_list.append(sql_update_status) # DEBUG TEST 
-                    mc.execute(update_patient_status_sql)
-                    insert_patient_log_status_sql = ("INSERT INTO PatientLog([InternalPatientID], [LogEntry], [Date], [Login], [PCName]) "
-                                            "VALUES ('{Patient_ID}', 'Patient status updated to Array " 
-                                            "using the Automating booking in arrays script version {Script_version}',"
-                                            " '{Created_date}', '{Staff_username}' , '{Staff_PC}')" 
-                    ).format(
-                        Patient_ID = get_Array_data_sql_result[0][0], 
-                        Script_version = config.scriptversion,
-                        Created_date = date_time,
-                        Staff_username = username,
-                        Staff_PC = computer_name
-                    )  
-                    mc.execute(insert_patient_log_status_sql) 
-        else: 
-            # the moka GW doesn't match, don't continue booking outside 
-            test_error = True 
-            df.loc[df_row,'Booking_in_sample_status'] = 'Error. Moka & GW names do not match'
+                ).format(
+                    Patient_ID = get_Array_data_sql_result[0][0], 
+                    Script_version = config.scriptversion,
+                    Created_date = date_time,
+                    Staff_username = username,
+                    Staff_PC = computer_name
+                )  
+                mc.execute(insert_patient_log_status_sql) 
     # If the function fails in an unexpected way 
     except Exception as e:      
         test_error = True 
@@ -614,85 +566,59 @@ computer_name = socket.gethostname()
 args = arg_parse()
 
 '''================== Run script =========================== ''' 
-
-        for df_row in range(len(df)):   
-                names_txt = make_txt_sql_friendly(df_row)
-                #print(df)
-                find_GW = find_patient_in_GW(df_row)
-                if find_GW == 0:
-                    print('found in DNA table')
-                elif find_GW == 1:
-                    print('found in cyto table')
-                elif find_GW == 2: 
-                    print('found in niether')
-                else:
-                    print('something is wrong')
-
-
-#try:
-for file in os.listdir(config.path):
-    # Look for all .txt files in the folder  
-    if file.endswith(".txt"):
-        # Define variables here to reset when each new .txt file is loaded 
-        date_time, error_list, error_occurred = txt_file_variables() 
-        to_process_path = os.path.join(config.path+"/"+file)
-        # Each row of this df is an single patient 
-        df = pd.read_csv(to_process_path, delimiter = "\t")
-        print(df)
-        # Fill rows with no gender to unknown 
-        df['Gender'] = df['Gender'].fillna('unknown') 
-        # Change to match Patients table in Moka
-        df['Gender'] = df['Gender'].replace(['Female','Male'],['F','M'])    
-        # Change GW Urgency to Mokas Priority 
-        df['Urgency'] = df['Urgency'].replace(['Urgent','Routine'],['True','False']) 
-        if 'Processed_status' not in df.columns:
-            # Add column to df & populate it with zeros 
-            df['Processed_status'] = 0
-        # Flag to be processed     
-        df['Processed_status'] = df['Processed_status'].fillna(0)
-        # Create a loop to go through the df , based on the row labels 
-        for df_row in range(len(df)): 
-            # Don't re run a row that's already been processed  
-            if df.loc[df_row,'Processed_status'] == 0:
-                # Make apostrophes in patients names SQL friendly 
-                make_txt_sql_friendly(df_row)
-                # Determine which table in GW details should be taken from 
-                find_GW_table = find_patient_in_GW(df_row)
-                if find_GW_table == 0:
-                    GW_table = '[dbo].[gwv-dnaspecimenlinked]'
-                elif find_GW == 1:
-                    GW_table = '[dbo].[gwv-cytospecimenlinked]'
-                elif find_GW == 2: 
-                    patient_error == True
-
-                # Attempt to book Patient into Moka 
-                # patient_error boolean will be set to True in the function if an error does occur     
-                patient_error = import_check_patients_table_moka(df_row)
-                if patient_error == True: 
-                    df.loc[df_row,'Processed_status'] = 'FAILED' 
-                    error_occurred = True
-                else: 
-                    # Run ArrayTable function for those rows which didn't fail
-                    # test_error boolean will be set to True in the function if an error does occur
-                    test_error = import_check_array_table_moka(df_row) 
-                    if test_error == True: 
-                        df.loc[df_row,'Processed_status'] = 'FAILED'
+try:
+    for file in os.listdir(config.path):
+        # Look for all .txt files in the folder  
+        if file.endswith(".txt"):
+            # Define variables here to reset when each new .txt file is loaded 
+            date_time, error_list, error_occurred = txt_file_variables() 
+            to_process_path = os.path.join(config.path+"/"+file)
+            # Each row of this df is an single patient 
+            df = pd.read_csv(to_process_path, delimiter = "\t")
+            # Fill rows with no gender to unknown 
+            df['Gender'] = df['Gender'].fillna('unknown') 
+            # Change to match Patients table in Moka
+            df['Gender'] = df['Gender'].replace(['Female','Male'],['F','M'])
+            # Change to match ArrayTest table in Moka 
+            df['Urgency'] = df['Urgency'].replace(['Urgent','Routine'],['True','False'])     
+            if 'Processed_status' not in df.columns:
+                # Add column to df & populate it with zeros 
+                df['Processed_status'] = 0
+            # Flag to be processed     
+            df['Processed_status'] = df['Processed_status'].fillna(0)
+            # Create a loop to go through the df , based on the row labels 
+            for df_row in range(len(df)): 
+                # Don't re run a row that's already been processed  
+                if df.loc[df_row,'Processed_status'] == 0:
+                    # Make apostrophes in patients names SQL friendly 
+                    make_txt_sql_friendly(df_row)
+                    # Attempt to book Patient into Moka 
+                    # patient_error boolean will be set to True in the function if an error does occur     
+                    patient_error = import_check_patients_table_moka(df_row)
+                    if patient_error == True: 
+                        df.loc[df_row,'Processed_status'] = 'FAILED' 
                         error_occurred = True
-                    else:
-                        # Row completed, all processing done
-                        df.loc[df_row,'Processed_status'] = 'Completed' 
-            # Check if this is the last row of the data frame
-            if df_row == len(df) - 1:
-                # Run error handling, additional prints if debug flag used 
-                error_handling() 
-                # Run save and move 
-                save_move_txt(to_process_path, file)  
-
-'''                            
-'''
+                    else: 
+                        # Run ArrayTable function for those rows which didn't fail
+                        # test_error boolean will be set to True in the function if an error does occur
+                        test_error = import_check_array_table_moka(df_row) 
+                        if test_error == True: 
+                            df.loc[df_row,'Processed_status'] = 'FAILED'
+                            error_occurred = True
+                        else:
+                            # Row completed, all processing done
+                            df.loc[df_row,'Processed_status'] = 'Completed' 
+                # Check if this is the last row of the data frame
+                if df_row == len(df) - 1:
+                    # Run error handling, additional prints if debug flag used 
+                    error_handling() 
+                    # Swap columns back before saving txt file
+                    df['Gender'] = df['Gender'].replace(['F','M'],['Female','Male'])
+                    df['Urgency'] = df['Urgency'].replace(['True','False'], ['Urgent','Routine']) 
+                    # Run save and move 
+                    save_move_txt(to_process_path, file)                                             
 except: 
     # Print to user in Moka 
     print('ERROR: Script not run. Send the below error message to Bioinformatics team') 
     if args.debug == True:
         print('Script unexpectedly broken', sys.exc_info()[0]) # Print the error to the terminals 
-'''
