@@ -95,11 +95,12 @@ def make_txt_sql_friendly(df_row):
     RETURN: None
     '''
     apostrophe = "'"
+    sql_apostrophe = "''"
     if apostrophe in df.loc[df_row,"LastName"]:
         # Add another apostrophe to all single ones
-        df.loc[df_row,"LastName"]=  df.loc[df_row,"LastName"].replace("'", "''")
+        df.loc[df_row,"LastName"]=  df.loc[df_row,"LastName"].replace(apostrophe, sql_apostrophe)
     if apostrophe in df.loc[df_row,"FirstName"]:
-        df.loc[df_row,"FirstName"]=  df.loc[df_row,"FirstName"].replace("'", "''")
+        df.loc[df_row,"FirstName"]=  df.loc[df_row,"FirstName"].replace(apostrophe, sql_apostrophe)
 
 # Patient booking function ==========================================
 def import_check_patients_table_moka(df_row):
