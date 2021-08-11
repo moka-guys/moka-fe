@@ -4,7 +4,7 @@ config for ImportTxtToDB script
 
 '''
 # Script version - Please update when the script is updated
-scriptversion = "2.0"
+scriptversion = "2.1"
 
 # Path to files to be imported 
 path = r"\\gstt.local\shared\Genetics\Array\Scanned array paperwork\Non-rushes"
@@ -18,7 +18,7 @@ processed_path =   path + "\\Booked\\"
 status_inprogress = '3'
 # 15 is 'Array' in the Status table 
 status_array = '15'
-# 1202218871 is 'Array to book in' in the Status table 
-status_arraytobebookedin = '1202218871'
+# 1202218873 is 'Array to book in' in the Status table 
+status_arraytobebookedin = '1202218873'
 # 1199901236 is 'Array to book in' in the Referral table 
 referral_arraytobebookedin = '1199901236'
