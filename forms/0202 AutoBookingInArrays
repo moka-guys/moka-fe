@@ -56,3 +56,10 @@ Form![s0202_AutoBookingInArrays].Requery
 
 
 End Sub
+
+Private Sub refresh_button_Click()
+' Refresh the subform when this button is pressed
+
+Form![s0202_AutoBookingInArrays].Requery
+
+End Sub
