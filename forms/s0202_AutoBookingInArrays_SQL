@@ -1,3 +1,4 @@
-SELECT Patients.PatientID, Patients.BookinLastName, Patients.BookinFirstName, ArrayTest.ArrayTestID, Patients.BookinDOB, Status.Status
-FROM (ArrayTest INNER JOIN Patients ON ArrayTest.InternalPatientID = Patients.InternalPatientID) INNER JOIN Status ON ArrayTest.StatusID = Status.StatusID
-WHERE (((ArrayTest.StatusID)=1202218871));
+SELECT Patients.PatientID, Patients.BookinLastName, Patients.BookinFirstName, ArrayTest.ArrayTestID, Patients.BookinDOB, Referral.Referral
+FROM (ArrayTest INNER JOIN Patients ON ArrayTest.InternalPatientID = Patients.InternalPatientID) INNER JOIN Referral ON ArrayTest.ReferralID = Referral.ReferralID
+WHERE (((ArrayTest.ReferralID)=1199901236));
+
