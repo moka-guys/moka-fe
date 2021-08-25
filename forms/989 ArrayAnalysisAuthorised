@@ -11,7 +11,7 @@ Private Function update_recordsource()
     start_date_formatted = Format(Me.start_date, "mm/dd/yyyy")
     end_date_formatted = Format(Me.end_date, "mm/dd/yyyy")
     
-    user_list = " (((Checker.Initials) LIKE 'KJM' OR (Checker.Initials) LIKE 'KM' OR (Checker.Initials) LIKE 'CD' OR (Checker.Initials) LIKE 'SCH' OR (Checker.Initials) LIKE 'CO' OR (Checker.Initials) LIKE 'AB' OR (Checker.Initials) LIKE 'SB')"
+    user_list = " (((Checker.Initials) LIKE 'KJM' OR (Checker.Initials) LIKE 'PCM' OR (Checker.Initials) LIKE 'CD' OR (Checker.Initials) LIKE 'SCH' OR (Checker.Initials) LIKE 'CO' OR (Checker.Initials) LIKE 'AB' OR (Checker.Initials) LIKE 'SB' OR (Checker.Initials) LIKE 'LW' OR (Checker.Initials) LIKE 'AT' OR (Checker.Initials) LIKE 'SEW' OR (Checker.Initials) LIKE 'AC' OR (Checker.Initials) LIKE 'EF' OR (Checker.Initials) LIKE 'Mav')"
 
     'SQL to pull out authorising counts for each authoriser grouped by result code based on the referral type and date range entered in form (count from both the first and second authoriser)
     sql_record_source = "TRANSFORM Count(Checker.Initials) AS CountOfInitials " _
