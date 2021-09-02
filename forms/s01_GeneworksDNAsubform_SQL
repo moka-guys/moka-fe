@@ -1,3 +1,3 @@
-SELECT dbo_DNANumber.DNANo AS [DNA number], dbo_DNASpecimen.Concentration AS Conc, dbo_DNASpecimen.PatientID, dbo_DNASpecimen.DateReceived AS [Specimen received], dbo_DNASpecimen.DatePrepared AS [Specimen prepared], dbo_DNASpecimen.SpecimenNo AS [Specimen number], dbo_DNASpecimen.Comment, dbo_DNASpecimen.SpecimenType
-FROM dbo_DNASpecimen LEFT JOIN dbo_DNANumber ON dbo_DNASpecimen.SpecimenNo = dbo_DNANumber.SpecimenNo
-ORDER BY dbo_DNASpecimen.DateReceived DESC , dbo_DNASpecimen.DatePrepared DESC;
+SELECT dbo_DNANumber.DNANo AS [DNA number], dbo_dnaspecimenlinked.Concentration AS Conc, dbo_dnaspecimenlinked.PatientID, dbo_dnaspecimenlinked.DateReceived AS [Specimen received], dbo_dnaspecimenlinked.DatePrepared AS [Specimen prepared], dbo_dnaspecimenlinked.SpecimenNo AS [Specimen number], dbo_dnaspecimenlinked.Comment, dbo_dnaspecimenlinked.SpecimenType
+FROM dbo_dnaspecimenlinked LEFT JOIN dbo_DNANumber ON dbo_dnaspecimenlinked.SpecimenNo = dbo_DNANumber.SpecimenNo
+ORDER BY dbo_dnaspecimenlinked.DateReceived DESC , dbo_dnaspecimenlinked.DatePrepared DESC;

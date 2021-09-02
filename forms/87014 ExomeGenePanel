@@ -634,7 +634,7 @@ Private Sub SubmitButton_Click()
             
             'Find all DNAs in GeneWorks for current patient, so they can be imported if not already in Moka
             Dim rsDNAs As ADODB.Recordset
-            sqlDNAs = "SELECT dbo_DNANumber.DNANo, dbo_DNASpecimen.Concentration FROM dbo_DNASpecimen INNER JOIN dbo_DNANumber ON dbo_DNASpecimen.SpecimenNo = dbo_DNANumber.SpecimenNo WHERE dbo_DNASpecimen.PatientID = '" & patientID_PRU & "'"
+            sqlDNAs = "SELECT dbo_DNANumber.DNANo, dbo_dnaspecimenlinked.Concentration FROM dbo_dnaspecimenlinked INNER JOIN dbo_DNANumber ON dbo_dnaspecimenlinked.SpecimenNo = dbo_DNANumber.SpecimenNo WHERE dbo_dnaspecimenlinked.PatientID = '" & patientID_PRU & "'"
             Set rsDNAs = New ADODB.Recordset
             rsDNAs.Open sqlDNAs, CurrentProject.Connection, adOpenKeyset
             'Loop through DNAs for current patient
@@ -676,7 +676,7 @@ Private Sub SubmitButton_Click()
             'If no DNAs are active, find the most recent DNA and activate it
             If rsActiveDNAs.RecordCount = 0 Then
                 Dim rsNewestDNA As ADODB.Recordset
-                sqlNewestDNA = "SELECT TOP 1 DNA.DNAID, DNA.DNANumber FROM (DNA INNER JOIN dbo_DNANumber ON DNA.DNANumber = dbo_DNANumber.DNANo) INNER JOIN dbo_DNASpecimen ON dbo_DNANumber.SpecimenNo = dbo_DNASpecimen.SpecimenNo WHERE DNA.InternalPatientID = " & internalPatID & " ORDER BY dbo_DNASpecimen.DateReceived DESC"
+                sqlNewestDNA = "SELECT TOP 1 DNA.DNAID, DNA.DNANumber FROM (DNA INNER JOIN dbo_DNANumber ON DNA.DNANumber = dbo_DNANumber.DNANo) INNER JOIN dbo_dnaspecimenlinked ON dbo_DNANumber.SpecimenNo = dbo_dnaspecimenlinked.SpecimenNo WHERE DNA.InternalPatientID = " & internalPatID & " ORDER BY dbo_dnaspecimenlinked.DateReceived DESC"
                 Set rsNewestDNA = New ADODB.Recordset
                 rsNewestDNA.Open sqlNewestDNA, CurrentProject.Connection, adOpenKeyset
                 If rsNewestDNA.RecordCount <> 0 Then 'Check that query has returned a DNA
