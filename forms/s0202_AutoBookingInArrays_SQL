@@ -1,4 +1,4 @@
-SELECT Patients.PatientID, Patients.BookinLastName, Patients.BookinFirstName, ArrayTest.ArrayTestID, Patients.BookinDOB, Referral.Referral
+SELECT Patients.PatientID, Patients.BookinLastName, Patients.BookinFirstName, ArrayTest.ArrayTestID, Patients.BookinDOB, Referral.Referral, ArrayTest.Priority
 FROM (ArrayTest INNER JOIN Patients ON ArrayTest.InternalPatientID = Patients.InternalPatientID) INNER JOIN Referral ON ArrayTest.ReferralID = Referral.ReferralID
-WHERE (((ArrayTest.ReferralID)=1199901236));
-
+WHERE (((ArrayTest.ReferralID)=1199901236))
+ORDER BY ArrayTest.Priority DESC , Patients.PatientID;
