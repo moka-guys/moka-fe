@@ -1,4 +1,4 @@
 SELECT dbo_DNATestRequest.RequestID, dbo_DNATestRequest.Disorder, dbo_DNATestRequest.TestClass, dbo_dnaspecimenlinked.DateReceived, dbo_DNATestRequest.SpecimenNo, dbo_DNANumber.DNANo, dbo_dnaspecimenlinked.Concentration, [lastname] & " " & [firstname] AS Name, dbo_Patient.Sex, dbo_DNATestRequest.DateRequested
 FROM ((dbo_DNATestRequest INNER JOIN dbo_dnaspecimenlinked ON dbo_DNATestRequest.SpecimenNo = Str(dbo_dnaspecimenlinked.SpecimenID)) INNER JOIN dbo_Patient ON Str(dbo_dnaspecimenlinked.PatientID) = dbo_Patient.PatientID) INNER JOIN dbo_DNANumber ON dbo_DNATestRequest.SpecimenNo = dbo_DNANumber.SpecimenNo
-WHERE (((dbo_DNATestRequest.Disorder)="Fragile X*") AND ((dbo_DNATestRequest.TestClass)="Diagnostic test") AND ((dbo_DNATestRequest.DateRequested)>=#4/1/2012#))
+WHERE (((dbo_DNATestRequest.Disorder) like "Fragile X*") AND ((dbo_DNATestRequest.TestClass)="Diagnostic test") AND ((dbo_DNATestRequest.DateRequested)>=#4/1/2012#))
 ORDER BY dbo_dnaspecimenlinked.DateReceived DESC;
