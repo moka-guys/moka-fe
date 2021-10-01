@@ -1,0 +1,14 @@
+Private Sub Report_Load()
+
+Dim rst As DAO.Recordset
+Dim comment_string_sql As String
+
+''' Get standard comment to add to the report from Item table
+comment_string_sql = "SELECT Item.Item From Item WHERE (((Item.ItemID)=4082))"
+
+''' Save output from sql in textbox on the report
+Set rst = CurrentDb.OpenRecordset(comment_string_sql)
+Me.comment_text = rst!Item
+
+rst.close
+End Sub
