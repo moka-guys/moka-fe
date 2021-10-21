@@ -1,0 +1,9 @@
+Option Compare Database
+
+Private Sub status_DblClick(Cancel As Integer)
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+    stDocName = "09 ArrayResultsByPostition"
+    stLinkCriteria = "[ArrayTestID]=" & Me![ArrayTestID]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+End Sub
