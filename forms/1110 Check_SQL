@@ -1,4 +1,4 @@
 SELECT ArrayTest.Priority, ArrayTest.RequestedDate, Referral.Referral, Patients.PatientID, [BookinFirstName] & " " & [BookinLastName] AS Name, ArrayTest.StatusID, Status.Status, ArrayTest.Check1ID, ArrayTest.Check2ID, ArrayTest.Check3ID, ArrayTest.Check4ID, ArrayTest.Check5ID, ArrayTest.SpecimenNo, ArrayTest.ArrayTestID, Patients.InternalPatientID, ArrayTest.Service, ResultCode.ResultCode, Referral.RunsheetSorting, DateDiff("d",[DateReceived],Now()) AS DaysOld
 FROM dbo_specimenlinked INNER JOIN ((((Patients INNER JOIN ArrayTest ON Patients.InternalPatientID = ArrayTest.InternalPatientID) INNER JOIN Referral ON ArrayTest.ReferralID = Referral.ReferralID) INNER JOIN Status ON ArrayTest.StatusID = Status.StatusID) INNER JOIN ResultCode ON ArrayTest.ArrayResultCodeID = ResultCode.ResultCodeID) ON dbo_specimenlinked.SpecimenTrustID = ArrayTest.SpecimenNo
-WHERE (((ArrayTest.StatusID)=1168443110 Or (ArrayTest.StatusID)=1202218854))
+WHERE (((ArrayTest.StatusID)=1168443110 Or (ArrayTest.StatusID)=1202218854 Or (ArrayTest.StatusID)=1202218872))
 ORDER BY ArrayTest.Priority, Referral.RunsheetSorting, DateDiff("d",[DateReceived],Now()) DESC;
