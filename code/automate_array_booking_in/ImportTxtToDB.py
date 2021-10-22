@@ -336,7 +336,7 @@ def import_check_array_table_moka(df_row):
         check_ArrayTest_result = mc.fetchall(check_ArrayTest_sql) 
         # If this returns 1, there is an ongoing test already
         if len(check_ArrayTest_result) == 1:   
-                df.loc[df_row,'Booking_in_sample_status'] = "Test already booked in & status is not completed/not possible"
+                df.loc[df_row,'Booking_in_sample_status'] = "Test already booked in with a status that is 'not possible' or 'completed'"
         # Patient is either in the DNA table with a completed/not possible status or not in there at all, to be inserted!
         else: 
             # Get data to form INSERT statement below 
