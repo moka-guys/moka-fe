@@ -85,8 +85,9 @@ def arg_parse():
 	   parser = argparse.ArgumentParser()
 	   parser.add_argument('-d', '--debug', action='store_true', help="Run this mode for increased error printing")
 	   return parser.parse_args()
+	   
+# Change apostrophes function ==================================================
 
-# Check for any apostrophies in patients names and make them SQL friendly here?
 def make_txt_sql_friendly(df_row):
     '''
     Single apostrophes in SQL are special characters, this creates issues with some patient's names
@@ -306,7 +307,7 @@ def import_check_patients_table_moka(df_row):
 def import_check_array_table_moka(df_row):
     '''
     This function checks if there is a test in the ArrayTest table for the Patient.
-    If there isn't a test or if there is at test and the status is Pending (2), Complete (4) or Not Possible (5) another test is added.
+    If there isn't a test or if there is at test and the status is Complete (4) or Not Possible (5) another test is added.
     If there is a test and it has any other status (which means it's ongoing), nothing is done.
     The test_error flag ensures errors are captured for returning to user,
     stopping other parts of the script running and for debugging.
@@ -320,14 +321,14 @@ def import_check_array_table_moka(df_row):
     # See if the function can run
     try:
         # Check a test for this SpecimenTrustID is already in the ArrayTest table 
-        # but does not have the status pending, complete or not possible 
+        # but does not have the status complete or not possible 
         check_ArrayTest_sql = ("SELECT [ArrayTest].[ArrayTestID]" 
                                 "FROM ( [Patients] INNER JOIN [ArrayTest] ON [Patients].[InternalPatientID] = [ArrayTest].[InternalPatientID])"
                                 "INNER JOIN ([dbo].[gwv-specimenlinked] INNER JOIN [dbo].[gwv-patientlinked] ON"
                                 "[dbo].[gwv-patientlinked].[PatientID] = [dbo].[gwv-specimenlinked].[PatientID])"
                                 "ON  [dbo].[gwv-patientlinked].[PatientTrustID] = [Patients].[PatientID]"
                                 "WHERE ([dbo].[gwv-specimenlinked].[SpecimenTrustID]='{SpecimenTrust_ID}'"
-                                "AND [ArrayTest].[StatusID] NOT IN (2,4,5))"  
+                                "AND [ArrayTest].[StatusID] NOT IN (4,5))"  
                         ).format(
                             SpecimenTrust_ID = df.loc[df_row,"SpecimenTrustID"] 
                         )
@@ -335,8 +336,8 @@ def import_check_array_table_moka(df_row):
         check_ArrayTest_result = mc.fetchall(check_ArrayTest_sql) 
         # If this returns 1, there is an ongoing test already
         if len(check_ArrayTest_result) == 1:   
-                df.loc[df_row,'Booking_in_sample_status'] = "Test already booked in & status is not completed/pending/not possible"
-        # Patient is either in the DNA table with a completed/pending/not possible status or not in there at all, to be inserted!
+                df.loc[df_row,'Booking_in_sample_status'] = "Test already booked in with a status that is 'not possible' or 'completed'"
+        # Patient is either in the DNA table with a completed/not possible status or not in there at all, to be inserted!
         else: 
             # Get data to form INSERT statement below 
             get_Array_data_sql = ("SELECT [Patients].[InternalPatientID], [dbo].[gwv-specimenlinked].[SpecimenID],  "
