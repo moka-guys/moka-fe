@@ -5,6 +5,11 @@ Public Function firefoxurl(url As String)
     'Use chrome on Windows 10 and Firefox on XP.
     'Initially set path of executable to chrome on Windows 10
     v = "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+    ' there are different locations for citrix vs cisco (FFS)
+    ' therefore if the first path does not exist try a second location
+    If Len(Dir(v)) = 0 Then
+        v = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+    End If
     'On XP the path to chrome will not exist, so if it doesn't exist, change to firefox path on XP
     'Dir will return an empty string if the file doesn't exist, so if the length of the string is 0, use firefox instead
     If Len(Dir(v)) = 0 Then
