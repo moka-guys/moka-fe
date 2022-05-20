@@ -2,7 +2,7 @@ Option Compare Database
 
 Private Sub Form_Open(Cancel As Integer)
 ' Add in check so that only approved users may access this Danger Danger form
-Dim rsUSR As dao.Recordset
+Dim rsUSR As DAO.Recordset
 Dim usr As String
 
 ' Access granted to Array(Checker:Authoriser Col = 4 or 5) and Binfx Admins (Checker:Authoriser Col = 1)
@@ -14,9 +14,9 @@ Set db = CurrentDb
 Set rsUSR = db.OpenRecordset(strUSRSQL, dbOpenDynaset, dbSeeChanges)
 
 ' Validate that user is authorised. Display alert if not authorised.
-If rsUSR!authoriser <> 1 And rsUSR!authoriser <> 4 Then
+If rsUSR!authoriser <> 1 And rsUSR!authoriser <> 4 And rsUSR!authoriser <> 5 Then
 MsgBox "You do not have authorisation to view this page.", vbExclamation, "ATTENTION"
-DoCmd.Close acForm, "4752 DeletePatientRecords"
+DoCmd.close acForm, "4752 DeletePatientRecords"
 End If
 
 End Sub
