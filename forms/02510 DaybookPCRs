@@ -19,75 +19,9 @@ End Sub
 
 Private Sub CheckedByID_AfterUpdate()
     
-''autodate
-ResultDate = Now()
-Debug.Print Me!Result
-Debug.Print Me!Result
-''email moka alert
-If (Not IsNull(Me!Result) And Not IsNull(Me!CheckedByID) And _
-Me!Result <> 5 And Me!Result <> 1190384957 And Me!Result <> 1190384958 And Me!Result <> 1190384929 And Me!Result <> 1190384930 And Me!Result <> 1190384906) Then
-    
-    Dim iCfg As CDO.Configuration
-    Dim iMsg As CDO.Message
-    Dim emailto As String
-    Dim subjectline As String
-    Dim emailbody As String
-    Set iCfg = New CDO.Configuration
-    With iCfg
-    '.Fields(cdoSMTPServer) = "smtp.gstt.local"       '<---old smtp that will go offline 10/04/2014
-    .Fields(cdoSMTPServer) = "relay.gstt.local"        '<---new smtp
-    .Fields(cdoSMTPServerPort) = 25
-    .Fields(cdoSendUsingMethod) = cdoSendUsingPort
-    .Fields(cdoSMTPConnectionTimeout) = 200
-    .Fields.update
-    End With
-    
-    'emailto = "Prenatal-array@gstt.nhs.uk;cytodutyscientist@gstt.nhs.uk"
-    'emailto = "joowook.ahn@gstt.nhs.uk" 'for testing
-    'subjectline = "Abnormal QF-PCR result for prenatal specimen " & Me!SpecimenNo
-    
-    'emailbody = "<font face='arial' size='3'>" _
-    & "Abnormal QF-PCR result<br /><br />" _
-    & "Specimen: <b>" & Me!SpecimenNo & "</b><br />" _
-    & "Name: <b>" & Me!Name & "</b><br />" _
-    & "Result: <b>" & Me.Result.Column(1) & "</b><br />" _
-    & "Test: <b>" & Me!Referral & "</b><br /><br />"
-    'If Not IsNull(Me!Comment) Then
-    '    emailbody = emailbody & "Any comments: " & Me!Comment & "<br /><br /><br />"
-    '    Else: emailbody = emailbody & "Any comments: <br /><br /><br />"
-    '    End If
-    'emailbody = emailbody & "QF-PCR request booked in: " & Me!RequestedDate & "<br />" _
-    & "QF-PCR result date: " & Me!AnalysedByDate & "<br /><br /><br /><br /></font>"
-    
-    'Set iMsg = New CDO.Message
-    'With iMsg
-    'Set .Configuration = iCfg
-    '.From = "aled.jones@gstt.nhs.uk"
-    '.Sender = "aled.jones@gstt.nhs.uk"
-    '.Subject = "TEST SUBJECT"
-    '.HTMLBody = "<font face='arial' size='3'>tEST bODY"
-    '.to = "aled.jones@gstt.nhs.uk"
-    'Debug.Print .HTMLBody
-    'Debug.Print .to
-    '.Send
-    
-    '.From = """Moka Alerts"" <moka.alerts@gstt.nhs.uk>"
-    '.Sender = "moka.alerts@gstt.nhs.uk"
-    '.ReplyTo = "Prenatal-array@gstt.nhs.uk"
-    '.Subject = subjectline
-    '.HTMLBody = emailbody
-    '.to = emailto
-    '.BCC = "moka.alerts@gstt.nhs.uk"
-    '.Send
-    'End With
-    
-    Set iMsg = Nothing
-    Set iCfg = Nothing
-    
-    MsgBox "Emails describing abnormal QF-PCR results are not currently being sent", , "Warning"
-    
-    End If
-    
+    ''autodate
+    ResultDate = Now()
+        
     'if analyst and checker details are entered, set status to complete
     If Not IsNull(Me.AnalysedByID) And Not IsNull(Me.CheckedByID) Then
         Me.StatusID = 4
@@ -99,3 +33,4 @@ Me!Result <> 5 And Me!Result <> 1190384957 And Me!Result <> 1190384958 And Me!Re
     End If
     
 End Sub
+
