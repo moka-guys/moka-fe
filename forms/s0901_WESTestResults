@@ -1,191 +1,12 @@
 
 Option Compare Database
 
-Private Sub add_block_Click()
-    'Open form to allow addition of new block codes for 100k cases
-    DoCmd.OpenForm "s0901_Add_Block_Codes", acFormDS
-End Sub
-
-Private Sub BlockAutomatedReporting_AfterUpdate()
-    'Record in patient log when this field is updated
-    Dim today_date As String
-    Dim UserName As String
-    Dim computer_name As String
-    Dim sql_pat_log As String
-    UserName = VBA.Environ("USERNAME")
-    computer_name = VBA.Environ("COMPUTERNAME")
-    today_date = Format(Now(), "dd/mmm/yyyy Hh:Nn:ss")
-    If Me.BlockAutomatedReporting = 0 Then
-        sql_pat_log = "INSERT INTO PatientLog (InternalPatientID, LogEntry, [Date], Login, PCName) " & _
-        "VALUES (" & Me.InternalPatientID & ", 'NGS: User unblocked auto reporting of 100k case', #" & today_date & "#,'" & _
-        UserName & "','" & computer_name & "')"
-    Else
-        sql_pat_log = "INSERT INTO PatientLog (InternalPatientID, LogEntry, [Date], Login, PCName) " & _
-        "VALUES (" & Me.InternalPatientID & ", 'NGS: User blocked auto reporting of 100k case: " & Me.BlockAutomatedReporting.Column(1) & "', #" & today_date & "#,'" & _
-        UserName & "','" & computer_name & "')"
-    End If
-    DoCmd.SetWarnings False
-    DoCmd.RunSQL sql_pat_log
-    DoCmd.SetWarnings True
-End Sub
-
 Private Sub btn_Coverage_Click()
     ' load s0901_NGSCoveragePopup form passing it the NGStest ID. to select coverage report gerneration arguments.
     Dim stLinkCritera As String
     If Not IsNull(Me![NGSTestID]) Then
         stLinkCriteria = "[NGSTestID] = " & Me.NGSTestID
         DoCmd.OpenForm "s0901_NGSCoveragePopup", , , stLinkCriteria
-    End If
-End Sub
-
-Private Sub Ctl100k_cover_sheet_Click()
-    'This function will call a python script that generates a 100k cover sheet and attach to 100k summary of findings PDF
-    Dim confirmation_message As String
-    Dim wsh As Object
-    Dim pythonPath As String
-    Dim scriptPath As String
-    Dim wshexec As Object
-    Dim stdout As String
-    Dim ngs_test_id As String
-    Dim msg_string As String
-    Dim script_command As String
-    Dim negneg_skip_auto_close As Boolean
-    negneg_skip_auto_close = False
-    ' Check that result code is negative, negative negative, previously reported variant or other
-    If Me.ResultCode <> 1 And Me.ResultCode <> 1189679670 And Me.ResultCode <> 1189679668 And Me.ResultCode <> 1189679598 Then
-        MsgBox "Cover reports can only be generated for reports that have result code of negative (N), negative negative (NN), previously reported variant (PRV) or other (O)"
-        Exit Sub
-    End If
-    confirmation_message = "RESULT CODE: " & Me.Parent.result_code.Column(2) & vbNewLine & vbNewLine & "Generate 100k cover sheet for this case?"
-    If Me.skip_labkey Then
-        confirmation_message = confirmation_message & vbNewLine & vbNewLine & _
-        "WARNING!!! Skip Labkey box is ticked. Labkey PID check will be skipped. Please make sure GeL participant ID and Interpretation Request ID " & _
-        "are entered correctly in Moka to ensure correct Summary of Findings is downloaded from portal!"
-    End If
-    If vbYes = MsgBox(confirmation_message, vbYesNo + vbQuestion, "Continue?") Then
-        Set wsh = CreateObject("WScript.Shell")
-        ' set path to the python executable
-        pythonPath = "\\gstt.local\Shared\Genetics_Data2\Array\Software\Python\python.exe"
-        ' set path to the script which will import the variants
-        scriptPath = "\\gstt.local\Apps\Moka\Files\Software\100K\gel_cover_report.py"
-        ' capture the NGSTestID from the form to pass to python script
-        ngs_test_id = Me.Parent.NGSTestID
-        ' Build command
-        script_command = "cmd.exe /S /C " & pythonPath & " " & scriptPath & " -n " & ngs_test_id
-        If Me.skip_labkey Then
-            script_command = script_command & " --skip_labkey"
-        End If
-        ' For negnegs, give user option to programmatically submit exit questionnaire and automatically download the summary of findings from interpretation portal
-        If Me.ResultCode = 1189679668 Then
-            msg_string = "For this NEGNEG case, do you want to automatically close the case in the interpretation portal and download summary of findings?" & vbNewLine & vbNewLine & _
-                         "This will only work for cases that have not yet been closed in the interpretation portal. "
-            If vbYes = MsgBox(msg_string, vbYesNo + vbQuestion, "Automatically close case in portal?") Then
-                script_command = script_command & " --submit_exit_q  --download_summary"
-            Else
-                ' If user decides not to close the case programmatically, set negneg_skip_auto_close to True
-                negneg_skip_auto_close = True
-            End If
-        End If
-        ' If result code not negneg, or if user skipped programmatic closing above, give the user option to automatically download the summary of findings from interpretation portal
-        If Me.ResultCode <> 1189679668 Or negneg_skip_auto_close Then
-            msg_string = "Download summary of findings from interpretation portal?" & vbNewLine & vbNewLine & _
-                         "This will only work for cases with a single summary of findings in the interpretation portal. " & _
-                         "For any other cases you must manually download and save as PDF in P:\Bioinformatics\GeL\technical_reports"
-            If vbYes = MsgBox(msg_string, vbYesNo + vbQuestion, "Download summary of findings?") Then
-                script_command = script_command & " --download_summary"
-            End If
-        End If
-        ' Redirect stderr to stdout
-        script_command = script_command & " 2>&1"
-        ' Run script.
-        Set wshexec = wsh.Exec(script_command)
-        'DoEvents pauses VBA until python script has finished running. wshexec.status is 0 while running and 1 when finished
-        Do While wshexec.Status = 0
-            DoEvents
-        Loop
-        'Capture any messages from python script (stdout is redirected to stderr in command)
-        stdout = wshexec.stdout.readall()
-        ' Report any standard error in msgbox
-        If stdout <> "" Then
-            MsgBox stdout
-        End If
-        ' Refresh is required to show file in NGSTestFiles
-        Me.refresh
-    End If
-End Sub
-
-Private Sub Ctl100k_email_Click()
-    'This function will call a python script that populates an email for sending 100k negative results
-    Dim rs_test_file As ADODB.Recordset
-    Dim sql_test_file As String
-    Dim path_to_results As String
-    Dim email_body As String
-    Dim wsh As Object
-    Dim pythonPath As String
-    Dim scriptPath As String
-    Dim wshexec As Object
-    Dim stdout As String
-    Dim msg_string As String
-    Dim script_command As String
-    If vbYes = MsgBox("Generate 100k results email for this case?", vbYesNo + vbQuestion, "Continue?") Then
-        ' Find results file that need emailing out
-        Set rs_test_file = New ADODB.Recordset
-        sql_test_file = "SELECT NGSTestFile.NGSTestFile " & _
-                          "FROM NGSTestFile " & _
-                         "WHERE NGSTestFile.NGSTestID = " & Me.NGSTestID & " AND NGSTestFile.Description = '100k Results'"
-        rs_test_file.Open sql_test_file, CurrentProject.Connection, adOpenKeyset
-        If rs_test_file.RecordCount <> 1 Then
-            MsgBox "Expected 1 attached file with description '100k Results' but found " & rs_test_file.RecordCount
-            Exit Sub
-        End If
-        path_to_results = rs_test_file.Fields("NGSTestFile")
-        ' Check we have an email for sending the results to
-        If IsNull(Me.ReportEmail) Then
-            MsgBox "No results email found for referring clinican"
-            Exit Sub
-        End If
-        ' Create the email message body
-        email_body = "<body style=\""font-family:Calibri,sans-serif;\"">" & _
-        "<b>100,000 Genomes Project result from the Genetics Laboratory at Viapath - Guy's Hospital</b><br><br>" & _
-        "PLEASE DO NOT REPLY TO THIS EMAIL ADDRESS WITH ENQUIRIES ABOUT REPORTS<br>" & _
-        "FOR ALL ENQUIRIES PLEASE CONTACT THE LABORATORY USING <a href=\""mailto:DNADutyScientist@viapath.co.uk\"">DNADutyScientist@viapath.co.uk</a><br><br>" & _
-        "Kind regards<br>" & _
-        "Genetics Laboratory<br>" & _
-        "5th Floor, Tower Wing<br>" & _
-        "Guy's Hospital<br>" & _
-        "London, SE1 9RT<br>" & _
-        "United Kingdom<br><br>" & _
-        "Tel: + 44 (0) 207 188 1709" & _
-        "</body>"
-        'Run the script to send the email
-        Set wsh = CreateObject("WScript.Shell")
-        ' set path to the python executable
-        pythonPath = "\\gstt.local\Shared\Genetics_Data2\Array\Software\Python\python.exe"
-        ' set path to the script which will import the variants
-        scriptPath = "\\gstt.local\Apps\Moka\Files\Software\100K\generate_email.py"
-        ' Build command
-        script_command = "cmd.exe /S /C " & pythonPath & " " & scriptPath
-        script_command = script_command & " --to " & Me.ReportEmail
-        script_command = script_command & " --subject ""100,000 Genomes Project Result"""
-        script_command = script_command & " --body """ & email_body & """"
-        script_command = script_command & " --attachments " & path_to_results
-        ' Redirect stderr to stdout
-        script_command = script_command & " 2>&1"
-        ' Run script.
-        'Debug.Print script_command
-        Set wshexec = wsh.Exec(script_command)
-        'DoEvents pauses VBA until python script has finished running. wshexec.status is 0 while running and 1 when finished
-        Do While wshexec.Status = 0
-            DoEvents
-        Loop
-        'Capture any messages from python script (stdout is redirected to stderr in command)
-        stdout = wshexec.stdout.readall()
-        ' Report any standard error in msgbox
-        If stdout <> "" Then
-            MsgBox stdout
-        End If
-        ' Refresh is required to show file in NGSTestFiles
-        Me.refresh
     End If
 End Sub
 
@@ -332,47 +153,6 @@ Private Sub GWWorksheet_AfterUpdate()
     DoCmd.SetWarnings True
 End Sub
 
-Private Sub import_100k_Click()
-    'Pass VCF filepath and test details to python script to parse VCF and insert records into Moka NGSVariants table
-    Dim wsh As Object
-    Dim pythonPath As String
-    Dim scriptPath As String
-    Dim wshexec As Object
-    Dim errReport As String
-    Dim int_pat_id As String
-    Dim ngs_test_id As String
-    Dim ir_id As String
-    Dim proband_id As String
-    If vbYes = MsgBox("Import 100k variants for this case?", vbYesNo + vbQuestion, "Continue?") Then
-        Set wsh = CreateObject("WScript.Shell")
-        ' set path to the python executable
-        pythonPath = "\\gstt.local\Shared\Genetics_Data2\Array\Software\Python\python.exe"
-        ' set path to the script which will import the variants
-        scriptPath = "\\gstt.local\Apps\Moka\Files\Software\100K\100k_variant_import.py"
-        ' capture the patientID and NGSTestID from the form to pass to python script
-        int_pat_id = Me.Parent.InternalPatientID
-        ngs_test_id = Me.Parent.NGSTestID
-        ir_id = Me.IRID
-        proband_id = Me.GELProbandID
-        ' Run script.
-        Set wshexec = wsh.Exec("cmd.exe /S /C " & pythonPath & " " & scriptPath & " --ir_id " & ir_id & " --proband_id " & proband_id & " --ngstest_id " & ngs_test_id & " --internal_pat_id " & int_pat_id & " 2>&1")
-        'DoEvents pauses VBA until python script has finished running. wshexec.status is 0 while running and 1 when finished
-        Do While wshexec.Status = 0
-            DoEvents
-        Loop
-        'Capture any error messages from python script (stdout is redirected to stderr in command)
-        errReport = wshexec.stdout.readall()
-        ' Report any standard error in msgbox
-        If errReport <> "" Then
-            MsgBox "The following error was encountered when attempting to import 100k variants: " & vbNewLine & vbNewLine & errReport, vbCritical, "ERROR"
-        End If
-        ' Refresh is required to sync imported variants from Python script
-        Me.refresh
-        'Find number previous overlapping variants
-        Call prevVars
-    End If
-End Sub
-
 Private Sub MDTdate_AfterUpdate()
     'Record in patient log when this field is updated
     Dim today_date As String
@@ -421,7 +201,7 @@ Private Sub Primary_Panel_DblClick(Cancel As Integer)
             rst.MoveNext
         Loop
         'Close the connection to database
-        rst.Close
+        rst.close
         Set rst = Nothing
         
     'Open folder containing file
@@ -457,46 +237,11 @@ Private Sub Secondary_Panel_DblClick(Cancel As Integer)
             rst.MoveNext
         Loop
         'Close the connection to database
-        rst.Close
+        rst.close
         Set rst = Nothing
         
     'Open folder containing file
         Shell "explorer.exe """ & DestFolder & "", vbNormalFocus
-    End If
-End Sub
-
-Private Sub skip_labkey_Click()
-    'Ticking this box allows the automated PID cross-check between Labkey and Geneworks to be skipped when generating a cover report for negative 100k cases
-    'This is required for pilot cases (which aren't in Labkey) or for rare cases where there is no DoB/NHS num avaialble in Geneworks e.g. because it's a fetal sample
-    'In these cases, the user generating the report must double check that GeL details entered to Moka are correct, to ensure that the correct summary of findings is pulled from the CIP API
-    Dim sql_pat_log As String
-    Dim UserName As String
-    Dim computer_name As String
-    Dim today_date As String
-    UserName = VBA.Environ("USERNAME")
-    computer_name = VBA.Environ("COMPUTERNAME")
-    today_date = Format(Now(), "dd/mmm/yyyy Hh:Nn:ss")
-    'If skip labkey box is ticked, get user to confirm that they have checked details entered to Moka are correct and record in patient log
-    If Me.skip_labkey Then
-        If vbYes = MsgBox("Have you checked the GeL participant ID and interpretation request ID have been entered to Moka correctly?", vbExclamation + vbYesNo, "IMPORTANT!") Then
-            sql_pat_log = "INSERT INTO PatientLog (InternalPatientID, LogEntry, [Date], Login, PCName) " & _
-            "VALUES (" & Me.InternalPatientID & ", 'NGS: User ticked skip labkey box and confirmed that GeL details entered correctly in Moka', #" & today_date & "#,'" & _
-            UserName & "','" & computer_name & "')"
-            DoCmd.SetWarnings False
-            DoCmd.RunSQL sql_pat_log
-            DoCmd.SetWarnings True
-        Else
-            'If user answers 'No' to above, untick the box
-            Me.skip_labkey = False
-        End If
-    'If skip labkey box is unticked, record in patient log
-    Else
-        sql_pat_log = "INSERT INTO PatientLog (InternalPatientID, LogEntry, [Date], Login, PCName) " & _
-        "VALUES (" & Me.InternalPatientID & ", 'NGS: User unticked skip labkey box.', #" & today_date & "#,'" & _
-        UserName & "','" & computer_name & "')"
-        DoCmd.SetWarnings False
-        DoCmd.RunSQL sql_pat_log
-        DoCmd.SetWarnings True
     End If
 End Sub
 
@@ -528,7 +273,7 @@ Private Sub TertiaryPanel_DblClick(Cancel As Integer)
             rst.MoveNext
         Loop
         'Close the connection to database
-        rst.Close
+        rst.close
         Set rst = Nothing
         
     'Open folder containing file
@@ -536,7 +281,7 @@ Private Sub TertiaryPanel_DblClick(Cancel As Integer)
     End If
 End Sub
 
-Private Sub RemoveAll_MouseDown(Button As Integer, Shift As Integer, x As Single, Y As Single)
+Private Sub RemoveAll_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     'To make it hard to accidentally press the button, have to hold down ctrl whilst clicking
     If Shift = acCtrlMask Then 'Code will only execute if ctrl key is pressed
         'Display warning message box and get confirmation from user that they want to proceed
@@ -1629,7 +1374,7 @@ Function UpdatePatientRes()
     Dim cn As String
     Dim R As String
     Dim S As String
-    Dim x As String
+    Dim X As String
     Dim Y As String
     Dim t As String
     Dim PL As String
@@ -1644,9 +1389,9 @@ Function UpdatePatientRes()
     cn = VBA.Environ("COMPUTERNAME")
     
 ' Check if there is a record already in the Patients results feild. If true, append new result to the end.
-    x = Me.InternalPatientID
+    X = Me.InternalPatientID
     Y = Me.Parent.txt_result
-    R = "SELECT OverallResultComments FROM Patients WHERE InternalPatientID = " + x + ""
+    R = "SELECT OverallResultComments FROM Patients WHERE InternalPatientID = " + X + ""
     A.Open R, CurrentProject.Connection, adOpenKeyset, adLockOptimistic, adCmdText
     
     If Not IsNull(A!OverallResultComments) Then
